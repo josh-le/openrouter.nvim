@@ -1,3 +1,9 @@
+local pickers = require "telescope.pickers"
+local finders = require "telescope.finders"
+local conf = require("telescope.config").values
+local actions = require "telescope.actions"
+local action_state = require "telescope.actions.state"
+
 local M = {}
 
 local state = {
@@ -56,9 +62,9 @@ end
 
 local update_chat_window = function(sn)
     for i = state.chats[sn].conversation_position + 1, #state.chats[sn].conversation do
-	local chat = state.chats[sn].conversation[i]
+	local message = state.chats[sn].conversation[i]
 
-	if chat.role == "model" then
+	if message.role == "model" then
 	    vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, state.chats[sn].buf_line, -1, false, { "model" })
 	    state.chats[sn].buf_line = state.chats[sn].buf_line + 1
 	else
@@ -66,7 +72,7 @@ local update_chat_window = function(sn)
 	    state.chats[sn].buf_line = state.chats[sn].buf_line + 1
 	end
 
-	vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, state.chats[sn].buf_line, -1, false, { chat.content })
+	vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, state.chats[sn].buf_line, -1, false, { message.content })
 	state.chats[sn].buf_line = state.chats[sn].buf_line + 1
     end
     state.chats[sn].conversation_position = #state.chats[sn].conversation
@@ -90,6 +96,57 @@ local open_chat_window = function()
 	}
 	state.display.chats[state.sn] = create_floating_window(opts, true)
     end
+end
+
+local fetch_models = function()
+    local handle, err = io.popen("curl -s https://openrouter.ai/api/v1/models")
+    if not handle then
+	error("Failed while fetching list of available models: " .. tostring(err))
+    end
+    local result = handle:read("*a")
+    handle:close()
+    local data = vim.fn.json_decode(result)
+    local r = {}
+    for _, model in ipairs(data.data) do
+      table.insert(r, {
+	  id = model.id,
+	  name = model.name,
+	  context_length = model.context_length,
+	  input_pricing = model.pricing.prompt,
+	  output_pricing = model.pricing.completion,
+      })
+    end
+    return r
+end
+
+local model_picker = function(opts)
+    opts = opts or {}
+    local model_list = fetch_models()
+    pickers.new(opts, {
+	prompt_title = "choose a model",
+	-- finder = finders.new_oneshot_job({ "find" }, opts )  <-- this executes the find command and calls entry_maker on the results
+	finder = finders.new_table {
+	    results = model_list,
+	    entry_maker = function(entry)
+		return {
+		    value = entry,
+		    display = entry.name, -- this is what is shown in the picker
+		    ordinal = entry.name, -- this is what we are searching on
+		    -- also 'path' to set absolute path and 'lnum' to specify line number
+		}
+	    end,
+	},
+	sorter = conf.generic_sorter(opts),
+	attach_mappings = function(prompt_bufnr, map)
+	    actions.select_default:replace(function()
+		actions.close(prompt_bufnr)
+		local selection = action_state.get_selected_entry()
+		state.chats[state.sn].model = selection.value.id
+		open_chat_window()
+	    end)
+	    return true
+	end,
+    }):find()
 end
 
 local create_new_chat = function()
@@ -116,6 +173,7 @@ local create_new_chat = function()
 	buf = -1,
 	win = -1,
     })
+    model_picker()
 end
 
 local toggle_session = function()
@@ -123,8 +181,9 @@ local toggle_session = function()
 	if #state.chats == 0 then
 	    state.sn = 1
 	    create_new_chat()
+	else
+	    open_chat_window()
 	end
-	open_chat_window()
     else
 	vim.api.nvim_win_hide(state.display.chats[state.sn].win)
     end

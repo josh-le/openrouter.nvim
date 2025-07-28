@@ -65,6 +65,7 @@ local fetch_models = function()
     return r
 end
 
+--[[
 local model_picker = function(opts)
     opts = opts or {}
     local model_list = fetch_models()
@@ -88,6 +89,36 @@ local model_picker = function(opts)
 		actions.close(prompt_bufnr)
 		local selection = action_state.get_selected_entry()
 		vim.api.nvim_put({ selection[1] }, "", false, true)
+	    end)
+	    return true
+	end,
+    }):find()
+end
+--]]
+
+local model_picker = function(opts)
+    opts = opts or {}
+    local model_list = fetch_models()
+    pickers.new(opts, {
+	prompt_title = "choose a model",
+	-- finder = finders.new_oneshot_job({ "find" }, opts )  <-- this executes the find command and calls entry_maker on the results
+	finder = finders.new_table {
+	    results = model_list,
+	    entry_maker = function(entry)
+		return {
+		    value = entry,
+		    display = entry.name, -- this is what is shown in the picker
+		    ordinal = entry.name, -- this is what we are searching on
+		    -- also 'path' to set absolute path and 'lnum' to specify line number
+		}
+	    end,
+	},
+	sorter = conf.generic_sorter(opts),
+	attach_mappings = function(prompt_bufnr, map)
+	    actions.select_default:replace(function()
+		actions.close(prompt_bufnr)
+		local selection = action_state.get_selected_entry()
+		print(vim.inspect(selection))
 	    end)
 	    return true
 	end,
