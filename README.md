@@ -2,6 +2,7 @@
 nvim plugin for interacting with LLMs via the openrouter API. very much a WIP
 ## todo
 - menu for llm selection
+    - preview window showing llm stats
 - dashboard? to show rate limits for different free LLMs
 - implement conversation in a tree like structure so you can branch off, rebase etc.
 ## ideas
