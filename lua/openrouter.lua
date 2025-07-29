@@ -54,7 +54,7 @@ local function create_floating_window(opts, enter)
 end
 
 local setup_chat_window = function(sn)
-    local title = "chat with " .. state.chats[state.sn].model
+    local title = "chat with " .. state.chats[state.sn].name
 
     vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, 0, -1, false, { title })
     state.chats[sn].buf_line = state.chats[sn].buf_line + 1
@@ -118,15 +118,15 @@ local fetch_models = function()
     end
     return r
 end
+local model_table = fetch_models()
 
 local model_picker = function(opts)
     opts = opts or {}
-    local model_list = fetch_models()
     pickers.new(opts, {
 	prompt_title = "choose a model",
 	-- finder = finders.new_oneshot_job({ "find" }, opts )  <-- this executes the find command and calls entry_maker on the results
 	finder = finders.new_table {
-	    results = model_list,
+	    results = model_table,
 	    entry_maker = function(entry)
 		return {
 		    value = entry,
@@ -141,7 +141,11 @@ local model_picker = function(opts)
 	    actions.select_default:replace(function()
 		actions.close(prompt_bufnr)
 		local selection = action_state.get_selected_entry()
-		state.chats[state.sn].model = selection.value.id
+		state.chats[state.sn].id = selection.value.id
+		state.chats[state.sn].name = selection.value.name
+		state.chats[state.sn].context_length = selection.value.context_length
+		state.chats[state.sn].input_pricing = selection.value.input_pricing
+		state.chats[state.sn].output_pricing = selection.value.output_pricing
 		open_chat_window()
 	    end)
 	    return true
@@ -151,21 +155,7 @@ end
 
 local create_new_chat = function()
     table.insert(state.chats, {
-	model = "qwen/qwen3-235b-a22b-2507:free",
-	conversation = {
-	    {
-		role = "model",
-		content = "hi i am a model",
-	    },
-	    {
-		role = "user",
-		content = "hi i am a user. what color is the sky",
-	    },
-	    {
-		role = "model",
-		content = "blue",
-	    },
-	},
+	conversation = {},
 	buf_line = 0, -- next line in the buffer to draw the chat to
 	conversation_position = 0,
     })

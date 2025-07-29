@@ -1,3 +1,6 @@
+CURRENTLY WORKING ON INSTALLING LUASEC WITH LUAROCKS SO WE CAN PING THE API
+    nixos is killing me here
+
 # openrouter.nvim
 nvim plugin for interacting with LLMs via the openrouter API. very much a WIP
 ## todo
