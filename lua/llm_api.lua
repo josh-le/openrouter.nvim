@@ -1,32 +1,14 @@
 local M = {}
 
-M.requesting = false
-
-function M.setup()
-    vim.api.nvim_create_user_command('OpenRouter', M.complete, { range = true })
+M.api_key = os.getenv('OPENROUTER_API_KEY')
+if not M.api_key then
+    error('Error: OPENROUTER_API_KEY not set')
+    return
 end
+M.url = 'https://openrouter.ai/api/v1/chat/completions'
 
-M.complete = function(opts)
-    opts = opts or {}
-	--    if M.requesting then
-	-- vim.notify('Request already in progress', vim.log.levels.WARN)
-	-- return
-	--    end
-
-    local lines = {
-	"what is the color of the sky",
-	"respond in one sentence",
-    }
-    local prompt = table.concat(lines, '\n')
-
-    local api_key = os.getenv('OPENROUTER_API_KEY')
-    if not api_key then
-	vim.notify('Error: OPENROUTER_API_KEY not set', vim.log.levels.ERROR)
-	return
-    end
-
+M.complete = function(prompt)
     local model = 'moonshotai/kimi-k2:free'
-    local url = 'https://openrouter.ai/api/v1/chat/completions'
 
     local payload = {
 	model = model,
@@ -40,10 +22,10 @@ M.complete = function(opts)
 	'curl',
 	'-s',
 	'-X', 'POST',
-	'-H', 'Authorization: Bearer ' .. api_key,
+	'-H', 'Authorization: Bearer ' .. M.api_key,
 	'-H', 'Content-Type: application/json',
 	'-d', json_payload,
-	url
+	M.url
     }
 
     vim.system(curl_cmd, {

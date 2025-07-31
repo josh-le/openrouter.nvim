@@ -8,9 +8,6 @@ local M = {}
 
 local state = {
     sn = 0, -- session number (which chat session we are on)
-    display = {
-	chats = {},
-    },
     chats = {},
 }
 local options = {}
@@ -56,7 +53,7 @@ end
 local setup_chat_window = function(sn)
     local title = "chat with " .. state.chats[state.sn].name
 
-    vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, 0, -1, false, { title })
+    vim.api.nvim_buf_set_lines(state.chats[sn].display.buf, 0, -1, false, { title })
     state.chats[sn].buf_line = state.chats[sn].buf_line + 1
 end
 
@@ -65,14 +62,14 @@ local update_chat_window = function(sn)
 	local message = state.chats[sn].conversation[i]
 
 	if message.role == "model" then
-	    vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, state.chats[sn].buf_line, -1, false, { "model" })
+	    vim.api.nvim_buf_set_lines(state.chats[sn].display.buf, state.chats[sn].buf_line, -1, false, { "model" })
 	    state.chats[sn].buf_line = state.chats[sn].buf_line + 1
 	else
-	    vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, state.chats[sn].buf_line, -1, false, { "user" })
+	    vim.api.nvim_buf_set_lines(state.chats[sn].display.buf, state.chats[sn].buf_line, -1, false, { "user" })
 	    state.chats[sn].buf_line = state.chats[sn].buf_line + 1
 	end
 
-	vim.api.nvim_buf_set_lines(state.display.chats[sn].buf, state.chats[sn].buf_line, -1, false, { message.content })
+	vim.api.nvim_buf_set_lines(state.chats[sn].display.buf, state.chats[sn].buf_line, -1, false, { message.content })
 	state.chats[sn].buf_line = state.chats[sn].buf_line + 1
     end
     state.chats[sn].conversation_position = #state.chats[sn].conversation
@@ -80,21 +77,21 @@ end
 
 local open_chat_window = function()
     local winconfig = window_configurations()
-    if not vim.api.nvim_buf_is_valid(state.display.chats[state.sn].buf) then
+    if not vim.api.nvim_buf_is_valid(state.chats[state.sn].display.buf) then
 	local opts = {
 	    buf = nil,
 	    config = winconfig.chat
 	}
-	state.display.chats[state.sn] = create_floating_window(opts, true)
-	vim.bo[state.display.chats[state.sn].buf].filetype = "markdown"
+	state.chats[state.sn].display = create_floating_window(opts, true)
+	vim.bo[state.chats[state.sn].display.buf].filetype = "markdown"
 	setup_chat_window(state.sn)
 	update_chat_window(state.sn)
     else
 	local opts = {
-	    buf = state.display.chats[state.sn].buf,
+	    buf = state.chats[state.sn].display.buf,
 	    config = winconfig.chat
 	}
-	state.display.chats[state.sn] = create_floating_window(opts, true)
+	state.chats[state.sn].display = create_floating_window(opts, true)
     end
 end
 
@@ -158,16 +155,16 @@ local create_new_chat = function()
 	conversation = {},
 	buf_line = 0, -- next line in the buffer to draw the chat to
 	conversation_position = 0,
-    })
-    table.insert(state.display.chats, {
-	buf = -1,
-	win = -1,
+	display = {
+	    buf = -1,
+	    win = -1,
+	}
     })
     model_picker()
 end
 
 local toggle_session = function()
-    if state.sn == 0 or not vim.api.nvim_win_is_valid(state.display.chats[state.sn].win) then
+    if state.sn == 0 or not vim.api.nvim_win_is_valid(state.chats[state.sn].display.win) then
 	if #state.chats == 0 then
 	    state.sn = 1
 	    create_new_chat()
@@ -175,7 +172,7 @@ local toggle_session = function()
 	    open_chat_window()
 	end
     else
-	vim.api.nvim_win_hide(state.display.chats[state.sn].win)
+	vim.api.nvim_win_hide(state.chats[state.sn].display.win)
     end
 end
 
