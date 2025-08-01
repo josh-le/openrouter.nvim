@@ -7,12 +7,10 @@ if not M.api_key then
 end
 M.url = 'https://openrouter.ai/api/v1/chat/completions'
 
-M.complete = function(prompt)
-    local model = 'moonshotai/kimi-k2:free'
-
+M.complete = function(model, conversation)
     local payload = {
 	model = model,
-	messages = { { role = 'user', content = prompt } }
+	messages = conversation,
     }
     local json_payload = vim.json.encode(payload)
 
@@ -64,9 +62,6 @@ M.handle_response = function(data)
     local response_lines = vim.split(content, '\n')
 
     print(response_lines[1])
-    -- vim.notify("printed response", vim.log.levels.INFO)
 end
-
-M.complete()
 
 return M

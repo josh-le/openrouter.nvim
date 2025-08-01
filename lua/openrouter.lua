@@ -3,14 +3,34 @@ local finders = require "telescope.finders"
 local conf = require("telescope.config").values
 local actions = require "telescope.actions"
 local action_state = require "telescope.actions.state"
+local llm_api = require "llm_api"
 
 local M = {}
 
+---@class openrouter.Chat
+---@field display openrouter.Display: display for this chat
+---@field conversation openrouter.ChatMessage[]: conversation history
+---@field buf_line integer: next line in the buffer to draw the conversation to
+---@field conversation_position integer: which message to draw next
+---@field id string: model's openrouter id
+---@field name string: model's name
+---@field context_length number: context length of model
+---@field input_pricing number: input price per million tokens
+---@field output_pricing number: output price per million tokens
+
+---@class openrouter.Display
+---@field buf integer: buffer number
+---@field win integer: window number
+
+---@class openrouter.ChatMessage
+---@field role string: user, system, assisstant, tool
+---@field content string: content of the chat message
+
 local state = {
     sn = 0, -- session number (which chat session we are on)
+    ---@type openrouter.Chat[]
     chats = {},
 }
-local options = {}
 
 local window_configurations = function()
     local width = vim.o.columns
@@ -39,11 +59,16 @@ local window_configurations = function()
     }
 end
 
-local function create_floating_window(opts, enter)
+local function create_chat_window(opts, enter)
     enter = enter or false
     local config = opts.config or {}
 
-    local buf = opts.buf or vim.api.nvim_create_buf(false, true)
+    local buf = opts.buf
+    if opts.buf then
+	buf = opts.buf
+    else
+	buf = vim.api.nvim_create_buf(false, true)
+    end
 
     local win = vim.api.nvim_open_win(buf, enter, config)
 
@@ -82,8 +107,10 @@ local open_chat_window = function()
 	    buf = nil,
 	    config = winconfig.chat
 	}
-	state.chats[state.sn].display = create_floating_window(opts, true)
+	state.chats[state.sn].display = create_chat_window(opts, true)
 	vim.bo[state.chats[state.sn].display.buf].filetype = "markdown"
+	vim.bo[state.chats[state.sn].display.buf].buftype = "nofile"
+	vim.bo[state.chats[state.sn].display.buf].modifiable = false
 	setup_chat_window(state.sn)
 	update_chat_window(state.sn)
     else
@@ -91,7 +118,7 @@ local open_chat_window = function()
 	    buf = state.chats[state.sn].display.buf,
 	    config = winconfig.chat
 	}
-	state.chats[state.sn].display = create_floating_window(opts, true)
+	state.chats[state.sn].display = create_chat_window(opts, true)
     end
 end
 
@@ -121,7 +148,6 @@ local model_picker = function(opts)
     opts = opts or {}
     pickers.new(opts, {
 	prompt_title = "choose a model",
-	-- finder = finders.new_oneshot_job({ "find" }, opts )  <-- this executes the find command and calls entry_maker on the results
 	finder = finders.new_table {
 	    results = model_table,
 	    entry_maker = function(entry)
@@ -153,7 +179,7 @@ end
 local create_new_chat = function()
     table.insert(state.chats, {
 	conversation = {},
-	buf_line = 0, -- next line in the buffer to draw the chat to
+	buf_line = 0,
 	conversation_position = 0,
 	display = {
 	    buf = -1,
@@ -178,7 +204,6 @@ end
 
 M.setup = function(opts)
     opts = opts or {}
-    options = opts
     vim.keymap.set("n", "<leader>or", toggle_session)
 end
 
