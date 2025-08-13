@@ -17,6 +17,9 @@ local M = {}
 ---@field context_length number: context length of model
 ---@field input_pricing number: input price per million tokens
 ---@field output_pricing number: output price per million tokens
+---@field label string: title of the chat
+---@field date_created string: date and time chat was created
+---@field sn integer: the session number associated with this chat
 
 ---@class openrouter.Display
 ---@field buf integer: buffer number
@@ -55,7 +58,11 @@ local window_configurations = function()
     }
 
     return {
-	chat = chat
+	global = {
+	    width = width,
+	    height = height,
+	},
+	chat = chat,
     }
 end
 
@@ -76,11 +83,36 @@ local function create_chat_window(opts, enter)
 end
 
 local setup_chat_window = function(sn)
-    local title = "chat with " .. state.chats[state.sn].name
+    local title = "chat with " .. state.chats[sn].name
 
     vim.api.nvim_buf_set_lines(state.chats[sn].display.buf, 0, -1, false, { title })
-    state.chats[sn].buf_line = state.chats[sn].buf_line + 1
 end
+
+local fetch_models = function()
+    local handle, err = io.popen("curl -s https://openrouter.ai/api/v1/models")
+    if not handle then
+	error("Failed while fetching list of available models: " .. tostring(err))
+    end
+    local result = handle:read("*a")
+    handle:close()
+    if result == "" then
+	error("Could not fetch list of available models.")
+    end
+    local data = vim.fn.json_decode(result)
+    local r = {}
+    for _, model in ipairs(data.data) do
+	table.insert(r, {
+	    id = model.id,
+	    name = model.name,
+	    context_length = model.context_length,
+	    input_pricing = model.pricing.prompt,
+	    output_pricing = model.pricing.completion,
+	})
+    end
+    return r
+end
+local cr = coroutine.create(fetch_models)
+local _, model_table = coroutine.resume(cr)
 
 local update_chat_window = function(sn)
     for i = state.chats[sn].conversation_position + 1, #state.chats[sn].conversation do
@@ -109,8 +141,6 @@ local open_chat_window = function()
 	}
 	state.chats[state.sn].display = create_chat_window(opts, true)
 	vim.bo[state.chats[state.sn].display.buf].filetype = "markdown"
-	vim.bo[state.chats[state.sn].display.buf].buftype = "nofile"
-	vim.bo[state.chats[state.sn].display.buf].modifiable = false
 	setup_chat_window(state.sn)
 	update_chat_window(state.sn)
     else
@@ -121,28 +151,6 @@ local open_chat_window = function()
 	state.chats[state.sn].display = create_chat_window(opts, true)
     end
 end
-
-local fetch_models = function()
-    local handle, err = io.popen("curl -s https://openrouter.ai/api/v1/models")
-    if not handle then
-	error("Failed while fetching list of available models: " .. tostring(err))
-    end
-    local result = handle:read("*a")
-    handle:close()
-    local data = vim.fn.json_decode(result)
-    local r = {}
-    for _, model in ipairs(data.data) do
-      table.insert(r, {
-	  id = model.id,
-	  name = model.name,
-	  context_length = model.context_length,
-	  input_pricing = model.pricing.prompt,
-	  output_pricing = model.pricing.completion,
-      })
-    end
-    return r
-end
-local model_table = fetch_models()
 
 local model_picker = function(opts)
     opts = opts or {}
@@ -184,19 +192,73 @@ local create_new_chat = function()
 	display = {
 	    buf = -1,
 	    win = -1,
-	}
+	},
+	id = nil,
+	name = nil,
+	context_length = nil,
+	input_pricing = nil,
+	output_pricing = nil,
+	label = "new chat " .. os.date("%Y-%m-%d %H:%M:%S"),
+	date = os.date("%Y-%m-%d %H:%M:%S"),
+	sn = #state.chats + 1,
     })
+    state.sn = #state.chats
     model_picker()
+end
+
+local chat_picker = function(opts)
+    opts = opts or {}
+    local chat_picker_list = {}
+    print(#state.chats)
+    for _, chat in ipairs(state.chats) do
+	local existing_chat = {
+	    label = chat.label,
+	    date_created = chat.date_created,
+	    sn = chat.sn,
+	}
+	table.insert(chat_picker_list, existing_chat)
+    end
+    local new_chat = {
+	label = "Create a new chat",
+	date_created = os.date("%Y-%m-%d %H:%M:%S"),
+	sn = -1,
+    }
+    table.insert(chat_picker_list, new_chat)
+    print('hi')
+    print(#chat_picker_list)
+    pickers.new(opts, {
+	prompt_title = "choose a chat",
+	finder = finders.new_table {
+	    results = chat_picker_list,
+	    entry_maker = function(entry)
+		return {
+		    value = entry.sn,
+		    display = entry.label, -- this is what is shown in the picker
+		    ordinal = entry.date_created, -- this is what we are searching on
+		    -- also 'path' to set absolute path and 'lnum' to specify line number
+		}
+	    end,
+	},
+	sorter = conf.generic_sorter(opts),
+	attach_mappings = function(prompt_bufnr, map)
+	    actions.select_default:replace(function()
+		actions.close(prompt_bufnr)
+		local selection = action_state.get_selected_entry()
+		if selection.value == -1 then
+		    create_new_chat()
+		    state.sn = #state.chats
+	 	else
+		    state.sn = selection.value
+		end
+	    end)
+	    return true
+	end,
+    }):find()
 end
 
 local toggle_session = function()
     if state.sn == 0 or not vim.api.nvim_win_is_valid(state.chats[state.sn].display.win) then
-	if #state.chats == 0 then
-	    state.sn = 1
-	    create_new_chat()
-	else
-	    open_chat_window()
-	end
+	chat_picker()
     else
 	vim.api.nvim_win_hide(state.chats[state.sn].display.win)
     end

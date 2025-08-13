@@ -1,13 +1,10 @@
-CURRENTLY WORKING ON INSTALLING LUASEC WITH LUAROCKS SO WE CAN PING THE API
-    nixos is killing me here
-
 # openrouter.nvim
 nvim plugin for interacting with LLMs via the openrouter API. very much a WIP
 ## todo
-- menu for llm selection
-    - preview window showing llm stats
-- dashboard? to show rate limits for different free LLMs
-- implement conversation in a tree like structure so you can branch off, rebase etc.
+- [x] menu for llm selection
+    - [ ] preview window showing llm stats
+- [ ] dashboard? to show rate limits for different free LLMs
+- [ ] implement conversation in a tree like structure so you can branch off, rebase etc.
 ## ideas
 - mcp
 - regular tool calls that i will use a lot
