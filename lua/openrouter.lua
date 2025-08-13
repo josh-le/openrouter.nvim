@@ -199,7 +199,7 @@ local create_new_chat = function()
 	input_pricing = nil,
 	output_pricing = nil,
 	label = "new chat " .. os.date("%Y-%m-%d %H:%M:%S"),
-	date = os.date("%Y-%m-%d %H:%M:%S"),
+	date_created = os.date("%Y-%m-%d %H:%M:%S"),
 	sn = #state.chats + 1,
     })
     state.sn = #state.chats
@@ -225,7 +225,7 @@ local chat_picker = function(opts)
     }
     table.insert(chat_picker_list, new_chat)
     print('hi')
-    print(#chat_picker_list)
+    print(vim.inspect(chat_picker_list))
     pickers.new(opts, {
 	prompt_title = "choose a chat",
 	finder = finders.new_table {
@@ -246,9 +246,9 @@ local chat_picker = function(opts)
 		local selection = action_state.get_selected_entry()
 		if selection.value == -1 then
 		    create_new_chat()
-		    state.sn = #state.chats
 	 	else
 		    state.sn = selection.value
+		    open_chat_window()
 		end
 	    end)
 	    return true
