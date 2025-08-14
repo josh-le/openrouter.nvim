@@ -39,11 +39,9 @@ local window_configurations = function()
     local width = vim.o.columns
     local height = vim.o.lines
 
-    -- Default size to 80% of screen if not provided
     local win_width = math.floor(width * 0.9)
     local win_height = math.floor(height * 0.8)
 
-    -- Calculate center position
     local row = math.floor((height - win_height) / 3)
     local col = math.floor((width - win_width) / 2)
 
@@ -66,6 +64,29 @@ local window_configurations = function()
     }
 end
 
+local chat_keymaps = {
+    {
+	mode = "n",
+	key = "q",
+	callback = ":q<CR>",
+    },
+}
+
+---@class openrouter.Keymap
+---@field mode string: mode for keymap
+---@field key string: keymap
+---@field callback function: callback function for keymap
+
+---@param keymaps openrouter.Keymap[]: list of keymaps to set
+---@param buf integer: buffer number
+local set_keymaps = function(keymaps, buf)
+    for _, keymap in ipairs(keymaps) do
+	vim.keymap.set(keymap.mode, keymap.key, keymap.callback, {
+	    buffer = buf
+	})
+    end
+end
+
 local function create_chat_window(opts, enter)
     enter = enter or false
     local config = opts.config or {}
@@ -78,6 +99,8 @@ local function create_chat_window(opts, enter)
     end
 
     local win = vim.api.nvim_open_win(buf, enter, config)
+
+    set_keymaps(chat_keymaps, buf)
 
     return { buf = buf, win = win }
 end
@@ -209,7 +232,6 @@ end
 local chat_picker = function(opts)
     opts = opts or {}
     local chat_picker_list = {}
-    print(#state.chats)
     for _, chat in ipairs(state.chats) do
 	local existing_chat = {
 	    label = chat.label,
@@ -224,8 +246,6 @@ local chat_picker = function(opts)
 	sn = -1,
     }
     table.insert(chat_picker_list, new_chat)
-    print('hi')
-    print(vim.inspect(chat_picker_list))
     pickers.new(opts, {
 	prompt_title = "choose a chat",
 	finder = finders.new_table {
